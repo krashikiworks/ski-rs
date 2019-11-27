@@ -11,6 +11,15 @@ struct Stax {
     stack: Vec<Ski>,
 }
 
+impl From<Sequence> for Stax {
+    fn from(program: Sequence) -> Self {
+        Stax {
+            program,
+            stack: Vec::new(),
+        }
+    }
+}
+
 impl Stax {
     pub fn new() -> Self {
         Stax {

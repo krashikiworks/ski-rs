@@ -21,7 +21,7 @@ impl Stax {
 
     // programからargumentに全て移し終わった時にargumentに2つ以上残っていたらInvalidError::SurplusTokens
     // argumentからpopしようとしてできなかったならInvalidError::NotEnoughAtoms
-    fn eval(&mut self) -> Result<Sequence, InvalidError> {
+    pub fn eval(&mut self) -> Result<Sequence, InvalidError> {
         while let Some(top) = self.program.pop() {
             match top {
                 Token::Atom(a) => match a {

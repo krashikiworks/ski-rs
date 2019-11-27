@@ -1,7 +1,7 @@
 use crate::combinator::Ski;
 use crate::error::{InvalidError, ParseAstError};
 use crate::sequence::Sequence;
-use crate::token::Token;
+use crate::token::{Atom, Token};
 
 use std::convert::TryFrom;
 use std::str::FromStr;
@@ -27,27 +27,27 @@ impl From<Token> for Ast {
 impl From<Ski> for Ast {
     fn from(ski: Ski) -> Self {
         match ski {
-            Ski::S(_) => Ast::from(Token::S),
-            Ski::K(_) => Ast::from(Token::K),
-            Ski::I(_) => Ast::from(Token::I),
+            Ski::S(_) => Ast::from(Token::s()),
+            Ski::K(_) => Ast::from(Token::k()),
+            Ski::I(_) => Ast::from(Token::i()),
             Ski::Sp(sp) => {
-                let mut ast = Ast::from(Token::Apply);
-                ast.set_function(Ast::from(Token::S));
+                let mut ast = Ast::from(Token::a());
+                ast.set_function(Ast::from(Token::s()));
                 ast.set_argument(Ast::from(sp.get()));
                 ast
             }
             Ski::Kp(kp) => {
-                let mut ast = Ast::from(Token::Apply);
-                ast.set_function(Ast::from(Token::S));
+                let mut ast = Ast::from(Token::a());
+                ast.set_function(Ast::from(Token::s()));
                 ast.set_argument(Ast::from(kp.get()));
                 ast
             }
             Ski::Spp(spp) => {
                 //  Spp(i, i) = ``sii
-                let mut ast = Ast::from(Token::Apply);
+                let mut ast = Ast::from(Token::a());
                 ast.set_function({
-                    let mut ast = Ast::from(Token::Apply);
-                    ast.set_function(Ast::from(Token::S));
+                    let mut ast = Ast::from(Token::a());
+                    ast.set_function(Ast::from(Token::s()));
                     ast.set_argument(Ast::from(spp.get_first()));
                     ast
                 });
@@ -89,10 +89,8 @@ impl Ast {
     }
 
     pub fn get_function(&self) -> Option<Box<Ast>> {
-        match self.function {
-            Some(b) => Some(b),
-            None => None,
-        }
+        // TODO: impl this
+        unimplemented!();
     }
 
     fn set_function(&mut self, ast: Ast) {
@@ -100,10 +98,8 @@ impl Ast {
     }
 
     pub fn get_argument(&self) -> Option<Box<Ast>> {
-        match self.argument {
-            Some(b) => Some(b),
-            None => None,
-        }
+        // TODO: impl this
+        unimplemented!();
     }
 
     fn set_argument(&mut self, ast: Ast) {
@@ -114,7 +110,7 @@ impl Ast {
         let mut counter = 1;
         for t in seq {
             match t {
-                Token::Apply => counter += 1,
+                Token::Apply(_) => counter += 1,
                 _ => counter -= 1,
             }
         }
@@ -132,7 +128,7 @@ impl Ast {
         let mut counter = 1;
         for (ord, t) in seq.into_iter().enumerate() {
             match t {
-                Token::Apply => counter += 1,
+                Token::Apply(_) => counter += 1,
                 _ => counter -= 1,
             }
             if counter == 0 {
@@ -158,8 +154,8 @@ impl Ast {
         let token = seq.dequeue().unwrap();
 
         match token {
-            Token::Apply => {
-                let mut ast = Ast::from(Token::Apply);
+            Token::Apply(_) => {
+                let mut ast = Ast::from(Token::a());
 
                 let split_point = Ast::search_valid_point(&seq)?;
                 let (first_half, second_half) = seq.split(split_point + 1);
@@ -171,46 +167,71 @@ impl Ast {
                 ast.set_argument(argument);
                 Ok(ast)
             }
-            Token::S => {
-                let ast = Ast::from(Token::S);
-                Ok(ast)
-            }
-            Token::K => {
-                let ast = Ast::from(Token::K);
-                Ok(ast)
-            }
-            Token::I => {
-                let ast = Ast::from(Token::I);
-                Ok(ast)
-            }
+            Token::Atom(atom) => match atom {
+                Atom::S => {
+                    let ast = Ast::from(Token::s());
+                    Ok(ast)
+                }
+                Atom::K => {
+                    let ast = Ast::from(Token::k());
+                    Ok(ast)
+                }
+                Atom::I => {
+                    let ast = Ast::from(Token::i());
+                    Ok(ast)
+                }
+            },
         }
+    }
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+struct NodesPair {
+    function: ValidAst,
+    argument: ValidAst,
+}
+
+#[derive(Debug, Eq, PartialEq, Hash, Clone)]
+pub struct ValidAst {
+    data: Token,
+    node: Option<Box<NodesPair>>,
+}
+
+impl TryFrom<Ast> for ValidAst {
+    type Error = InvalidError;
+
+    fn try_from(ast: Ast) -> Result<Self, Self::Error> {
+        let data = ast.get_data();
+
+        // funcがあってargが無い、あるいはfuncは無いがargはあるといった場合はInvalid
+        unimplemented!();
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::token::Token::*;
+    use crate::token::Token;
 
     #[test]
     fn with_token() {
         let ast = Ast {
-            data: I,
+            data: Token::i(),
             function: None,
             argument: None,
         };
 
-        assert_eq!(ast, Ast::from(I));
+        assert_eq!(ast, Ast::from(Token::i()));
     }
 
     #[test]
     fn set_function() {
-        let mut ast = Ast::from(Token::I);
-        let func = Ast::from(Token::I);
+        let mut ast = Ast::from(Token::i());
+        let func = Ast::from(Token::i());
 
         let target = Ast {
-            data: I,
-            function: Some(Box::new(Ast::from(I))),
+            data: Token::i(),
+            function: Some(Box::new(Ast::from(Token::i()))),
             argument: None,
         };
 
@@ -221,14 +242,14 @@ mod tests {
 
     #[test]
     fn set_argument() {
-        let mut ast = Ast::from(Token::I);
-        let arg = Ast::from(Token::I);
+        let mut ast = Ast::from(Token::i());
+        let arg = Ast::from(Token::i());
 
         let target = Ast {
-            data: I,
+            data: Token::i(),
             function: None,
             argument: Some(Box::new(Ast {
-                data: I,
+                data: Token::i(),
                 function: None,
                 argument: None,
             })),
@@ -294,9 +315,9 @@ mod tests {
         let seq = Sequence::try_from(str).unwrap();
         let ast = Ast::parse_recursive(seq);
 
-        let mut target = Ast::from(Apply);
-        let func = Ast::from(S);
-        let arg = Ast::from(K);
+        let mut target = Ast::from(Token::a());
+        let func = Ast::from(Token::s());
+        let arg = Ast::from(Token::k());
         target.set_function(func);
         target.set_argument(arg);
 
@@ -324,9 +345,9 @@ mod tests {
         let seq = Sequence::try_from(str).unwrap();
         let ast = Ast::parse(seq);
 
-        let mut target = Ast::from(Apply);
-        let func = Ast::from(S);
-        let arg = Ast::from(K);
+        let mut target = Ast::from(Token::a());
+        let func = Ast::from(Token::s());
+        let arg = Ast::from(Token::k());
         target.set_function(func);
         target.set_argument(arg);
 
@@ -353,9 +374,9 @@ mod tests {
         {
             let str = "`sk";
             let ast = Ast::from_str(str);
-            let mut target = Ast::from(Apply);
-            let func = Ast::from(S);
-            let arg = Ast::from(K);
+            let mut target = Ast::from(Token::a());
+            let func = Ast::from(Token::s());
+            let arg = Ast::from(Token::k());
             target.set_function(func);
             target.set_argument(arg);
 

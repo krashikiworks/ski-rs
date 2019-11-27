@@ -2,7 +2,7 @@ use std::convert::TryFrom;
 use std::marker::PhantomData;
 
 use crate::error::InvalidTokenAsArgument;
-use crate::token::Token;
+use crate::token::{Atom, Token};
 
 trait Combinator {
     type Argument: Combinator;
@@ -28,7 +28,7 @@ impl<T> From<Ski> for Container1<T> {
 
 impl<T> Container1<T> {
     fn get(&self) -> Ski {
-        *self.content
+        *self.content.clone()
     }
 }
 
@@ -51,11 +51,11 @@ impl<T> From<(Ski, Ski)> for Container2<T> {
 
 impl<T> Container2<T> {
     fn first(&self) -> Ski {
-        unimplemented!();
+        *self.content_1.clone()
     }
 
     fn second(&self) -> Ski {
-        *self.content_2
+        *self.content_2.clone()
     }
 }
 
@@ -74,10 +74,12 @@ impl TryFrom<Token> for Ski {
 
     fn try_from(t: Token) -> Result<Self, Self::Error> {
         match t {
-            Token::S => Ok(Ski::S(S {})),
-            Token::K => Ok(Ski::K(K {})),
-            Token::I => Ok(Ski::I(I {})),
-            Token::Apply => Err(InvalidTokenAsArgument::new(Token::Apply)),
+            Token::Atom(a) => match a {
+                Atom::S => Ok(Ski::S(S {})),
+                Atom::K => Ok(Ski::K(K {})),
+                Atom::I => Ok(Ski::I(I {})),
+            },
+            Token::Apply(_) => Err(InvalidTokenAsArgument::new(Token::a())),
         }
     }
 }
@@ -106,7 +108,7 @@ impl Ski {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct S {}
+pub struct S {}
 
 impl Combinator for S {
     type Argument = Ski;
@@ -120,7 +122,7 @@ impl Combinator for S {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct K {}
+pub struct K {}
 
 impl Combinator for K {
     type Argument = Ski;
@@ -134,7 +136,7 @@ impl Combinator for K {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct I {}
+pub struct I {}
 
 impl Combinator for I {
     type Argument = Ski;
@@ -146,7 +148,7 @@ impl Combinator for I {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct Sp {
+pub struct Sp {
     container: Container1<Sp>,
 }
 
@@ -168,7 +170,7 @@ impl Sp {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct Kp {
+pub struct Kp {
     container: Container1<Kp>,
 }
 
@@ -176,7 +178,7 @@ impl Combinator for Kp {
     type Argument = Ski;
     type Target = Ski;
 
-    fn apply(&self, arg: Self::Argument) -> Self::Target {
+    fn apply(&self, _arg: Self::Argument) -> Self::Target {
         self.container.get()
     }
 }
@@ -188,7 +190,7 @@ impl Kp {
 }
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 
-struct Spp {
+pub struct Spp {
     content: Container2<Spp>,
 }
 
@@ -199,7 +201,7 @@ impl Combinator for Spp {
     fn apply(&self, arg: Self::Argument) -> Self::Target {
         self.content
             .first()
-            .apply(arg)
+            .apply(arg.clone())
             .apply(self.content.second().apply(arg))
     }
 }

@@ -4,7 +4,7 @@ use crate::ast::Ast;
 use crate::combinator::Ski;
 use crate::error::InvalidError;
 use crate::sequence::Sequence;
-use crate::token::Token;
+use crate::token::{Atom, Token};
 
 struct Stax {
     program: Sequence,
@@ -17,10 +17,12 @@ impl Stax {
     fn eval(&mut self) -> Result<Sequence, InvalidError> {
         while let Some(top) = self.program.pop() {
             match top {
-                Token::S => self.stack.push(Ski::try_from(Token::S).unwrap()),
-                Token::K => self.stack.push(Ski::try_from(Token::K).unwrap()),
-                Token::I => self.stack.push(Ski::try_from(Token::I).unwrap()),
-                Token::Apply => {
+                Token::Atom(a) => match a {
+                    Atom::S => self.stack.push(Ski::try_from(Token::s()).unwrap()),
+                    Atom::K => self.stack.push(Ski::try_from(Token::k()).unwrap()),
+                    Atom::I => self.stack.push(Ski::try_from(Token::i()).unwrap()),
+                },
+                Token::Apply(_) => {
                     let result = self.apply()?;
                     self.program.join(&Sequence::from(Ast::from(result)))
                 }

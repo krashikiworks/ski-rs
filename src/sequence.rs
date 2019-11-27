@@ -50,10 +50,10 @@ impl TryFrom<&str> for Sequence {
 
         for (i, c) in s.chars().enumerate() {
             match c {
-                '`' => v.push_back(Token::Apply),
-                's' => v.push_back(Token::S),
-                'k' => v.push_back(Token::K),
-                'i' => v.push_back(Token::I),
+                '`' => v.push_back(Token::a()),
+                's' => v.push_back(Token::s()),
+                'k' => v.push_back(Token::k()),
+                'i' => v.push_back(Token::i()),
                 _ => return Err(LexiconError::new(i as u32, c)),
             }
         }
@@ -115,9 +115,18 @@ mod tests {
 
     #[test]
     fn from_str_valid() {
-        use Token::*;
         let string = "```s``kii";
-        let vec = vec![Apply, Apply, Apply, S, Apply, Apply, K, I, I];
+        let vec = vec![
+            Token::a(),
+            Token::a(),
+            Token::a(),
+            Token::s(),
+            Token::a(),
+            Token::a(),
+            Token::k(),
+            Token::i(),
+            Token::i(),
+        ];
         let vec = VecDeque::from(vec);
         let tokens = Sequence::from(vec);
         println!("{:?}", tokens);
@@ -156,9 +165,9 @@ mod tests {
     #[test]
     fn dequeue() {
         let mut seq = Sequence::try_from("`sk").unwrap();
-        assert_eq!(seq.dequeue(), Some(Token::Apply));
-        assert_eq!(seq.dequeue(), Some(Token::S));
-        assert_eq!(seq.dequeue(), Some(Token::K));
+        assert_eq!(seq.dequeue(), Some(Token::a()));
+        assert_eq!(seq.dequeue(), Some(Token::s()));
+        assert_eq!(seq.dequeue(), Some(Token::k()));
         assert_eq!(seq.dequeue(), None);
     }
 
@@ -167,13 +176,13 @@ mod tests {
         let mut seq = Sequence::try_from("`sk").unwrap();
         for (u, t) in (&seq).into_iter().enumerate() {
             if u == 0 {
-                assert_eq!(t, &Token::Apply);
+                assert_eq!(t, &Token::a());
             }
             if u == 1 {
-                assert_eq!(t, &Token::S);
+                assert_eq!(t, &Token::s());
             }
             if u == 2 {
-                assert_eq!(t, &Token::K);
+                assert_eq!(t, &Token::k());
             }
         }
 
@@ -181,10 +190,10 @@ mod tests {
 
         for (u, t) in (&seq).into_iter().enumerate() {
             if u == 0 {
-                assert_eq!(t, &Token::S);
+                assert_eq!(t, &Token::s());
             }
             if u == 1 {
-                assert_eq!(t, &Token::K);
+                assert_eq!(t, &Token::k());
             }
         }
     }

@@ -5,8 +5,6 @@ pub mod sequence;
 pub mod stack;
 pub mod token;
 
-pub mod Token2;
-
 /*
     s, k, iはwell-formed/validである
     x, yが`well-formed/validならば, `xyもwell-formed/validである

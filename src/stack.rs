@@ -12,6 +12,13 @@ struct Stax {
 }
 
 impl Stax {
+    pub fn new() -> Self {
+        Stax {
+            program: Sequence::new(),
+            stack: Vec::new(),
+        }
+    }
+
     // programからargumentに全て移し終わった時にargumentに2つ以上残っていたらInvalidError::SurplusTokens
     // argumentからpopしようとしてできなかったならInvalidError::NotEnoughAtoms
     fn eval(&mut self) -> Result<Sequence, InvalidError> {

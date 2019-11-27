@@ -89,6 +89,10 @@ impl<'a> IntoIterator for &'a Sequence {
 }
 
 impl Sequence {
+    pub fn new() -> Self {
+        Sequence(VecDeque::new())
+    }
+
     pub fn pop(&mut self) -> Option<Token> {
         self.0.pop_back()
     }

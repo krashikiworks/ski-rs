@@ -89,8 +89,7 @@ impl Ast {
     }
 
     pub fn get_function(&self) -> Option<Box<Ast>> {
-        // TODO: impl this
-        unimplemented!();
+        self.function.clone()
     }
 
     fn set_function(&mut self, ast: Ast) {
@@ -98,8 +97,7 @@ impl Ast {
     }
 
     pub fn get_argument(&self) -> Option<Box<Ast>> {
-        // TODO: impl this
-        unimplemented!();
+        self.argument.clone()
     }
 
     fn set_argument(&mut self, ast: Ast) {
@@ -186,31 +184,49 @@ impl Ast {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-struct NodesPair {
-    function: ValidAst,
-    argument: ValidAst,
+struct ValidAstInnerNode {
+    function: Box<ValidAst>,
+    argument: Box<ValidAst>,
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct ValidAst {
-    data: Token,
-    node: Option<Box<NodesPair>>,
+enum ValidAst {
+    Leaf(Atom),
+    Apply(ValidAstInnerNode),
 }
 
-impl TryFrom<Ast> for ValidAst {
-    type Error = InvalidError;
-
-    fn try_from(ast: Ast) -> Result<Self, Self::Error> {
-        let data = ast.get_data();
-
-        // funcがあってargが無い、あるいはfuncは無いがargはあるといった場合はInvalid
-        unimplemented!();
+impl From<Ski> for ValidAst {
+    fn from(ski: Ski) -> Self {
+        match ski {
+            Ski::S(_) => ValidAst::Leaf(Atom::S),
+            Ski::K(_) => ValidAst::Leaf(Atom::K),
+            Ski::I(_) => ValidAst::Leaf(Atom::I),
+            // Sp(x) = `sx
+            Ski::Sp(sp) => ValidAst::Apply(ValidAstInnerNode {
+                function: Box::new(ValidAst::Leaf(Atom::S)),
+                argument: Box::new(ValidAst::from(sp.get())),
+            }),
+            // Kp(x) = `kx
+            Ski::Kp(kp) => ValidAst::Apply(ValidAstInnerNode {
+                function: Box::new(ValidAst::Leaf(Atom::S)),
+                argument: Box::new(ValidAst::from(kp.get())),
+            }),
+            // Spp(x, y) = `sp(x)y = ``sxy = `(`sx)y
+            Ski::Spp(spp) => ValidAst::Apply(ValidAstInnerNode {
+                function: Box::new(ValidAst::Apply(ValidAstInnerNode {
+                    function: Box::new(ValidAst::Leaf(Atom::S)),
+                    argument: Box::new(ValidAst::from(spp.get_first())),
+                })),
+                argument: Box::new(ValidAst::from(spp.get_second())),
+            }),
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::combinator::{Ski, I, K, S};
     use crate::token::Token;
 
     #[test]

@@ -1,5 +1,5 @@
 use crate::combinator::Ski;
-use crate::error::{InvalidError, ParseAstError};
+use crate::error::{FormulaError, InvalidError};
 use crate::sequence::Sequence;
 use crate::token::{Atom, Token};
 
@@ -7,16 +7,15 @@ use std::convert::TryFrom;
 use std::str::FromStr;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-pub struct Ast {
+pub struct RawAst {
     data: Token,
-    // TODO: functionは無いけどargumentはあるAstの取り扱いについて
-    function: Option<Box<Ast>>,
-    argument: Option<Box<Ast>>,
+    function: Option<Box<RawAst>>,
+    argument: Option<Box<RawAst>>,
 }
 
-impl From<Token> for Ast {
+impl From<Token> for RawAst {
     fn from(t: Token) -> Self {
-        Ast {
+        RawAst {
             data: t,
             function: None,
             argument: None,
@@ -24,109 +23,109 @@ impl From<Token> for Ast {
     }
 }
 
-impl From<Ski> for Ast {
+impl From<Ski> for RawAst {
     fn from(ski: Ski) -> Self {
         match ski {
-            Ski::S(_) => Ast::from(Token::s()),
-            Ski::K(_) => Ast::from(Token::k()),
-            Ski::I(_) => Ast::from(Token::i()),
+            Ski::S => RawAst::from(Token::s()),
+            Ski::K => RawAst::from(Token::k()),
+            Ski::I => RawAst::from(Token::i()),
             Ski::Sp(sp) => {
-                let mut ast = Ast::from(Token::a());
-                ast.set_function(Ast::from(Token::s()));
-                ast.set_argument(Ast::from(sp.get()));
+                let mut ast = RawAst::from(Token::a());
+                ast.set_function(RawAst::from(Token::s()));
+                ast.set_argument(RawAst::from(sp.get()));
                 ast
             }
             Ski::Kp(kp) => {
-                let mut ast = Ast::from(Token::a());
-                ast.set_function(Ast::from(Token::s()));
-                ast.set_argument(Ast::from(kp.get()));
+                let mut ast = RawAst::from(Token::a());
+                ast.set_function(RawAst::from(Token::s()));
+                ast.set_argument(RawAst::from(kp.get()));
                 ast
             }
             Ski::Spp(spp) => {
                 //  Spp(i, i) = ``sii
-                let mut ast = Ast::from(Token::a());
+                let mut ast = RawAst::from(Token::a());
                 ast.set_function({
-                    let mut ast = Ast::from(Token::a());
-                    ast.set_function(Ast::from(Token::s()));
-                    ast.set_argument(Ast::from(spp.get_first()));
+                    let mut ast = RawAst::from(Token::a());
+                    ast.set_function(RawAst::from(Token::s()));
+                    ast.set_argument(RawAst::from(spp.first()));
                     ast
                 });
-                ast.set_argument(Ast::from(spp.get_second()));
+                ast.set_argument(RawAst::from(spp.second()));
                 ast
             }
         }
     }
 }
 
-impl TryFrom<Sequence> for Ast {
-    type Error = InvalidError;
+impl TryFrom<Sequence> for RawAst {
+    type Error = FormulaError;
 
     fn try_from(value: Sequence) -> Result<Self, Self::Error> {
         Self::parse(value)
     }
 }
 
-impl FromStr for Ast {
-    type Err = ParseAstError;
+impl FromStr for RawAst {
+    type Err = InvalidError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let seqence = match Sequence::from_str(s) {
+        let sequence = match Sequence::from_str(s) {
             Ok(seq) => seq,
-            Err(lexerr) => return Err(ParseAstError::LexiconError(lexerr)),
+            Err(err) => return Err(InvalidError::LexiconError(err)),
         };
-        match Ast::try_from(seqence) {
+        match RawAst::try_from(sequence) {
             Ok(ast) => Ok(ast),
-            Err(inverr) => Err(ParseAstError::InvalidError(inverr)),
+            Err(inverr) => Err(InvalidError::FormulaError(inverr)),
         }
     }
 }
 
-impl Ast {
+impl RawAst {
     // no set_data because data is need by constructor
 
     pub fn get_data(&self) -> Token {
         self.data.clone()
     }
 
-    pub fn get_function(&self) -> Option<Box<Ast>> {
+    pub fn get_function(&self) -> Option<Box<RawAst>> {
         self.function.clone()
     }
 
-    fn set_function(&mut self, ast: Ast) {
+    fn set_function(&mut self, ast: RawAst) {
         self.function = Some(Box::new(ast));
     }
 
-    pub fn get_argument(&self) -> Option<Box<Ast>> {
+    pub fn get_argument(&self) -> Option<Box<RawAst>> {
         self.argument.clone()
     }
 
-    fn set_argument(&mut self, ast: Ast) {
+    fn set_argument(&mut self, ast: RawAst) {
         self.argument = Some(Box::new(ast));
     }
 
-    fn is_valid_simple(seq: &Sequence) -> Result<(), InvalidError> {
+    fn is_valid_simple(seq: &Sequence) -> Result<(), FormulaError> {
         let mut counter = 1;
         for t in seq {
             match t {
-                Token::Apply(_) => counter += 1,
+                Token::Apply => counter += 1,
                 _ => counter -= 1,
             }
         }
         if counter == 0 {
             Ok(())
         } else if counter > 0 {
-            Err(InvalidError::NotEnoughAtoms)
+            Err(FormulaError::NotEnoughAtoms)
         } else {
             // counter < 0
-            Err(InvalidError::SurplusTokens)
+            Err(FormulaError::SurplusTokens)
         }
     }
 
-    fn search_valid_point(seq: &Sequence) -> Result<usize, InvalidError> {
+    fn search_valid_point(seq: &Sequence) -> Result<usize, FormulaError> {
         let mut counter = 1;
         for (ord, t) in seq.into_iter().enumerate() {
             match t {
-                Token::Apply(_) => counter += 1,
+                Token::Apply => counter += 1,
                 _ => counter -= 1,
             }
             if counter == 0 {
@@ -134,48 +133,48 @@ impl Ast {
             }
         }
         if counter > 0 {
-            Err(InvalidError::NotEnoughAtoms)
+            Err(FormulaError::NotEnoughAtoms)
         } else {
             // counter < 0
-            Err(InvalidError::SurplusTokens)
+            Err(FormulaError::SurplusTokens)
         }
     }
 
-    fn parse(seq: Sequence) -> Result<Ast, InvalidError> {
+    fn parse(seq: Sequence) -> Result<RawAst, FormulaError> {
         let ast = Self::parse_recursive(seq)?;
         Ok(ast)
     }
 
-    fn parse_recursive(mut seq: Sequence) -> Result<Ast, InvalidError> {
-        Ast::is_valid_simple(&seq)?;
+    fn parse_recursive(mut seq: Sequence) -> Result<RawAst, FormulaError> {
+        RawAst::is_valid_simple(&seq)?;
         // seq can be unwraped safety because seq must not be Option::None (because seq is valid Sequence)
         let token = seq.dequeue().unwrap();
 
         match token {
-            Token::Apply(_) => {
-                let mut ast = Ast::from(Token::a());
+            Token::Apply => {
+                let mut ast = RawAst::from(Token::a());
 
-                let split_point = Ast::search_valid_point(&seq)?;
+                let split_point = RawAst::search_valid_point(&seq)?;
                 let (first_half, second_half) = seq.split(split_point + 1);
 
-                let function = Ast::parse_recursive(first_half)?;
+                let function = RawAst::parse_recursive(first_half)?;
                 ast.set_function(function);
 
-                let argument = Ast::parse_recursive(second_half)?;
+                let argument = RawAst::parse_recursive(second_half)?;
                 ast.set_argument(argument);
                 Ok(ast)
             }
             Token::Atom(atom) => match atom {
                 Atom::S => {
-                    let ast = Ast::from(Token::s());
+                    let ast = RawAst::from(Token::s());
                     Ok(ast)
                 }
                 Atom::K => {
-                    let ast = Ast::from(Token::k());
+                    let ast = RawAst::from(Token::k());
                     Ok(ast)
                 }
                 Atom::I => {
-                    let ast = Ast::from(Token::i());
+                    let ast = RawAst::from(Token::i());
                     Ok(ast)
                 }
             },
@@ -184,40 +183,59 @@ impl Ast {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-struct ValidAstInnerNode {
-    function: Box<ValidAst>,
-    argument: Box<ValidAst>,
+pub struct AstInner {
+    function: Box<Ast>,
+    argument: Box<Ast>,
 }
 
+impl AstInner {
+    pub fn to_function(&self) -> Ast {
+        *self.function.clone()
+    }
+
+    pub fn to_argument(&self) -> Ast {
+        *self.function.clone()
+    }
+
+    pub fn into_function(self) -> Ast {
+        *self.function
+    }
+
+    pub fn into_argument(self) -> Ast {
+        *self.argument
+    }
+}
+
+/// Abstruct syntax tree which represents Valid Ski Formula
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
-enum ValidAst {
+pub enum Ast {
     Leaf(Atom),
-    Apply(ValidAstInnerNode),
+    Apply(AstInner),
 }
 
-impl From<Ski> for ValidAst {
+impl From<Ski> for Ast {
     fn from(ski: Ski) -> Self {
         match ski {
-            Ski::S(_) => ValidAst::Leaf(Atom::S),
-            Ski::K(_) => ValidAst::Leaf(Atom::K),
-            Ski::I(_) => ValidAst::Leaf(Atom::I),
+            Ski::S => Ast::Leaf(Atom::S),
+            Ski::K => Ast::Leaf(Atom::K),
+            Ski::I => Ast::Leaf(Atom::I),
             // Sp(x) = `sx
-            Ski::Sp(sp) => ValidAst::Apply(ValidAstInnerNode {
-                function: Box::new(ValidAst::Leaf(Atom::S)),
-                argument: Box::new(ValidAst::from(sp.get())),
+            Ski::Sp(sp) => Ast::Apply(AstInner {
+                function: Box::new(Ast::Leaf(Atom::S)),
+                argument: Box::new(Ast::from(sp.get())),
             }),
             // Kp(x) = `kx
-            Ski::Kp(kp) => ValidAst::Apply(ValidAstInnerNode {
-                function: Box::new(ValidAst::Leaf(Atom::S)),
-                argument: Box::new(ValidAst::from(kp.get())),
+            Ski::Kp(kp) => Ast::Apply(AstInner {
+                function: Box::new(Ast::Leaf(Atom::S)),
+                argument: Box::new(Ast::from(kp.get())),
             }),
             // Spp(x, y) = `sp(x)y = ``sxy = `(`sx)y
-            Ski::Spp(spp) => ValidAst::Apply(ValidAstInnerNode {
-                function: Box::new(ValidAst::Apply(ValidAstInnerNode {
-                    function: Box::new(ValidAst::Leaf(Atom::S)),
-                    argument: Box::new(ValidAst::from(spp.get_first())),
+            Ski::Spp(spp) => Ast::Apply(AstInner {
+                function: Box::new(Ast::Apply(AstInner {
+                    function: Box::new(Ast::Leaf(Atom::S)),
+                    argument: Box::new(Ast::from(spp.first())),
                 })),
-                argument: Box::new(ValidAst::from(spp.get_second())),
+                argument: Box::new(Ast::from(spp.second())),
             }),
         }
     }
@@ -226,28 +244,28 @@ impl From<Ski> for ValidAst {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::combinator::{Ski, I, K, S};
+    use crate::combinator::Ski;
     use crate::token::Token;
 
     #[test]
     fn with_token() {
-        let ast = Ast {
+        let ast = RawAst {
             data: Token::i(),
             function: None,
             argument: None,
         };
 
-        assert_eq!(ast, Ast::from(Token::i()));
+        assert_eq!(ast, RawAst::from(Token::i()));
     }
 
     #[test]
     fn set_function() {
-        let mut ast = Ast::from(Token::i());
-        let func = Ast::from(Token::i());
+        let mut ast = RawAst::from(Token::i());
+        let func = RawAst::from(Token::i());
 
-        let target = Ast {
+        let target = RawAst {
             data: Token::i(),
-            function: Some(Box::new(Ast::from(Token::i()))),
+            function: Some(Box::new(RawAst::from(Token::i()))),
             argument: None,
         };
 
@@ -258,13 +276,13 @@ mod tests {
 
     #[test]
     fn set_argument() {
-        let mut ast = Ast::from(Token::i());
-        let arg = Ast::from(Token::i());
+        let mut ast = RawAst::from(Token::i());
+        let arg = RawAst::from(Token::i());
 
-        let target = Ast {
+        let target = RawAst {
             data: Token::i(),
             function: None,
-            argument: Some(Box::new(Ast {
+            argument: Some(Box::new(RawAst {
                 data: Token::i(),
                 function: None,
                 argument: None,
@@ -277,63 +295,63 @@ mod tests {
     }
 
     #[test]
-    fn simple_check_valid_tokens() {
+    fn simple_check_valid_token() {
         let t = Sequence::try_from("``sii").unwrap();
-        let result = Ast::is_valid_simple(&t);
+        let result = RawAst::is_valid_simple(&t);
         assert_eq!(result, Ok(()));
         let t = Sequence::try_from("`si").unwrap();
-        let result = Ast::is_valid_simple(&t);
+        let result = RawAst::is_valid_simple(&t);
         assert_eq!(result, Ok(()));
         let t = Sequence::try_from("`ki").unwrap();
-        let result = Ast::is_valid_simple(&t);
+        let result = RawAst::is_valid_simple(&t);
         assert_eq!(result, Ok(()));
     }
 
     #[test]
-    fn simple_check_invalid_tokens() {
+    fn simple_check_invalid_token() {
         // too much apply token
         let t = Sequence::try_from("```").unwrap();
-        let result = Ast::is_valid_simple(&t);
-        assert_eq!(result, Err(InvalidError::NotEnoughAtoms));
+        let result = RawAst::is_valid_simple(&t);
+        assert_eq!(result, Err(FormulaError::NotEnoughAtoms));
 
         // too much atom token
         let t = Sequence::try_from("`sss").unwrap();
-        let result = Ast::is_valid_simple(&t);
-        assert_eq!(result, Err(InvalidError::SurplusTokens));
+        let result = RawAst::is_valid_simple(&t);
+        assert_eq!(result, Err(FormulaError::SurplusTokens));
 
         // empty token (equals to too much apply)
         let t = Sequence::try_from("").unwrap();
-        let result = Ast::is_valid_simple(&t);
-        assert_eq!(result, Err(InvalidError::NotEnoughAtoms));
+        let result = RawAst::is_valid_simple(&t);
+        assert_eq!(result, Err(FormulaError::NotEnoughAtoms));
     }
 
     #[test]
     fn search_valid_point() {
         let s = Sequence::try_from("``sii").unwrap();
-        assert_eq!(Ast::search_valid_point(&s), Ok(4));
+        assert_eq!(RawAst::search_valid_point(&s), Ok(4));
         let s = Sequence::try_from("``siii").unwrap();
-        assert_eq!(Ast::search_valid_point(&s), Ok(4));
+        assert_eq!(RawAst::search_valid_point(&s), Ok(4));
         let s = Sequence::try_from("``si").unwrap();
         assert_eq!(
-            Ast::search_valid_point(&s),
-            Err(InvalidError::NotEnoughAtoms)
+            RawAst::search_valid_point(&s),
+            Err(FormulaError::NotEnoughAtoms)
         );
 
         let mut s = Sequence::try_from("`sk").unwrap();
-        assert_eq!(Ast::search_valid_point(&s), Ok(2));
+        assert_eq!(RawAst::search_valid_point(&s), Ok(2));
         s.dequeue(); // will be ["s", "k"]
-        assert_eq!(Ast::search_valid_point(&s), Ok(0));
+        assert_eq!(RawAst::search_valid_point(&s), Ok(0));
     }
 
     #[test]
     fn parse_recursive_valid() {
         let str = "`sk";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse_recursive(seq);
+        let ast = RawAst::parse_recursive(seq);
 
-        let mut target = Ast::from(Token::a());
-        let func = Ast::from(Token::s());
-        let arg = Ast::from(Token::k());
+        let mut target = RawAst::from(Token::a());
+        let func = RawAst::from(Token::s());
+        let arg = RawAst::from(Token::k());
         target.set_function(func);
         target.set_argument(arg);
 
@@ -344,26 +362,26 @@ mod tests {
     fn parse_recursive_invalid() {
         let str = "`s";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse_recursive(seq);
+        let ast = RawAst::parse_recursive(seq);
 
-        assert_eq!(ast, Err(InvalidError::NotEnoughAtoms));
+        assert_eq!(ast, Err(FormulaError::NotEnoughAtoms));
 
         let str = "`ski";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse_recursive(seq);
+        let ast = RawAst::parse_recursive(seq);
 
-        assert_eq!(ast, Err(InvalidError::SurplusTokens));
+        assert_eq!(ast, Err(FormulaError::SurplusTokens));
     }
 
     #[test]
     fn parse_valid() {
         let str = "`sk";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse(seq);
+        let ast = RawAst::parse(seq);
 
-        let mut target = Ast::from(Token::a());
-        let func = Ast::from(Token::s());
-        let arg = Ast::from(Token::k());
+        let mut target = RawAst::from(Token::a());
+        let func = RawAst::from(Token::s());
+        let arg = RawAst::from(Token::k());
         target.set_function(func);
         target.set_argument(arg);
 
@@ -374,25 +392,25 @@ mod tests {
     fn parse_invalid() {
         let str = "`s";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse_recursive(seq);
+        let ast = RawAst::parse_recursive(seq);
 
-        assert_eq!(ast, Err(InvalidError::NotEnoughAtoms));
+        assert_eq!(ast, Err(FormulaError::NotEnoughAtoms));
 
         let str = "`ski";
         let seq = Sequence::try_from(str).unwrap();
-        let ast = Ast::parse_recursive(seq);
+        let ast = RawAst::parse_recursive(seq);
 
-        assert_eq!(ast, Err(InvalidError::SurplusTokens));
+        assert_eq!(ast, Err(FormulaError::SurplusTokens));
     }
 
     #[test]
     fn from_str() {
         {
             let str = "`sk";
-            let ast = Ast::from_str(str);
-            let mut target = Ast::from(Token::a());
-            let func = Ast::from(Token::s());
-            let arg = Ast::from(Token::k());
+            let ast = RawAst::from_str(str);
+            let mut target = RawAst::from(Token::a());
+            let func = RawAst::from(Token::s());
+            let arg = RawAst::from(Token::k());
             target.set_function(func);
             target.set_argument(arg);
 
@@ -401,11 +419,11 @@ mod tests {
 
         {
             let str = "`s";
-            let ast = Ast::from_str(str);
+            let ast = RawAst::from_str(str);
 
             assert_eq!(
                 ast,
-                Err(ParseAstError::InvalidError(InvalidError::NotEnoughAtoms))
+                Err(InvalidError::FormulaError(FormulaError::NotEnoughAtoms))
             );
         }
     }

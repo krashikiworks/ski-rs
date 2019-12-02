@@ -27,30 +27,32 @@ impl LexiconError {
 }
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub enum InvalidError {
+pub enum FormulaError {
     NotEnoughAtoms,
     SurplusTokens,
 }
 
-impl fmt::Display for InvalidError {
+impl fmt::Display for FormulaError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
-impl Error for InvalidError {}
+impl Error for FormulaError {}
 
 #[derive(Debug, Eq, PartialEq, Hash)]
-pub struct InvalidTokenAsArgument(Token);
+pub enum InvalidError {
+    LexiconError(LexiconError),
+    FormulaError(FormulaError),
+}
 
-impl InvalidTokenAsArgument {
-    pub fn new(arg: Token) -> Self {
-        InvalidTokenAsArgument(arg)
+impl fmt::Display for InvalidError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LexiconError(err) => err.fmt(f),
+            Self::FormulaError(err) => err.fmt(f),
+        }
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Hash)]
-pub enum ParseAstError {
-    LexiconError(LexiconError),
-    InvalidError(InvalidError),
-}
+impl Error for InvalidError {}

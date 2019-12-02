@@ -1,15 +1,22 @@
-use crate::ast::Ast;
+use crate::ast::{Ast, RawAst};
 use crate::error::LexiconError;
 use crate::token::Token;
 
 use std::collections::VecDeque;
 use std::convert::{From, TryFrom};
+use std::ops::Add;
 use std::str::FromStr;
 
 /// Unlambda-style SKI expression として有効な記号の列。Unlambda-style SKI expression として有効な式はこの中に含まれる。
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Sequence(VecDeque<Token>);
+
+impl From<Token> for Sequence {
+    fn from(token: Token) -> Self {
+        Sequence(VecDeque::from(vec![token]))
+    }
+}
 
 impl From<VecDeque<Token>> for Sequence {
     fn from(inner: VecDeque<Token>) -> Self {
@@ -24,8 +31,8 @@ impl From<Vec<Token>> for Sequence {
 }
 
 // TODO: TryFromにするべき?
-impl From<Ast> for Sequence {
-    fn from(ast: Ast) -> Self {
+impl From<RawAst> for Sequence {
+    fn from(ast: RawAst) -> Self {
         // TODO: 非常に実装が汚い
         let mut vec = VecDeque::new();
         vec.push_back(ast.get_data());
@@ -39,6 +46,19 @@ impl From<Ast> for Sequence {
             None => (),
         };
         seq
+    }
+}
+
+impl From<Ast> for Sequence {
+    fn from(ast: Ast) -> Self {
+        match ast {
+            Ast::Leaf(leaf) => Sequence::from(Token::from(leaf)),
+            Ast::Apply(child) => {
+                Sequence::from(Token::a())
+                    + Sequence::from(child.to_function())
+                    + Sequence::from(child.to_argument())
+            }
+        }
     }
 }
 
@@ -66,6 +86,22 @@ impl FromStr for Sequence {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Sequence::try_from(s)
+    }
+}
+
+impl Add for Sequence {
+    type Output = Self;
+
+    fn add(self, arg: Self) -> Self::Output {
+        let mut v = VecDeque::new();
+        for t in self.0 {
+            v.push_back(t)
+        }
+        for t in arg.0 {
+            v.push_back(t)
+        }
+        Sequence::from(v)
+        // この後argは使用不可…だよな?
     }
 }
 

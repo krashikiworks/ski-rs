@@ -1,7 +1,8 @@
 use crate::ast::Ast;
-use crate::combinator::{Combinator, Ski};
 use crate::error::FormulaError;
+use crate::lambda::Apply;
 use crate::sequence::Sequence;
+use crate::term::Ski;
 use crate::token::{Atom, Token};
 
 pub struct Stax {
@@ -31,7 +32,7 @@ impl Stax {
                 },
                 Token::Apply => {
                     let result = self.apply()?;
-                    self.program.join(&Sequence::from(Ast::from(result)))
+                    self.stack.push(result);
                 }
             }
         }
@@ -46,8 +47,9 @@ impl Stax {
     fn apply(&mut self) -> Result<Ski, FormulaError> {
         let function = self.pop()?;
         let argument = self.pop()?;
+        let ret = function.apply(argument);
 
-        Ok(function.apply(argument))
+        Ok(ret)
     }
 
     fn pop(&mut self) -> Result<Ski, FormulaError> {
@@ -58,13 +60,15 @@ impl Stax {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::*;
     use std::convert::TryFrom;
 
     #[test]
     fn eval() {
-        let seq = Sequence::try_from("```s``kii```skiis").unwrap();
+        let str = "```s``kii```skiis";
+        let seq = Sequence::try_from(str).unwrap();
         let mut stax = Stax::from(seq);
         let result = stax.eval();
 

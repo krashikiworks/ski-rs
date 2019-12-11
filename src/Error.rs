@@ -1,5 +1,3 @@
-use crate::token::Token;
-
 use std::error::Error;
 use std::fmt;
 
@@ -56,3 +54,15 @@ impl fmt::Display for InvalidError {
 }
 
 impl Error for InvalidError {}
+
+impl From<LexiconError> for InvalidError {
+    fn from(e: LexiconError) -> Self {
+        InvalidError::LexiconError(e)
+    }
+}
+
+impl From<FormulaError> for InvalidError {
+    fn from(e: FormulaError) -> Self {
+        InvalidError::FormulaError(e)
+    }
+}

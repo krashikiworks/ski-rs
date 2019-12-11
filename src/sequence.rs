@@ -1,14 +1,12 @@
-use crate::ast::{Ast, RawAst};
-use crate::error::LexiconError;
-use crate::token::Token;
-
 use std::collections::VecDeque;
 use std::convert::{From, TryFrom};
 use std::ops::Add;
-use std::str::FromStr;
 
-/// Unlambda-style SKI expression として有効な記号の列。Unlambda-style SKI expression として有効な式はこの中に含まれる。
+use crate::ast::Ast;
+use crate::error::{FormulaError, LexiconError};
+use crate::token::Token;
 
+/// Unlambda-style SKI expression として有効なTokenの列。有効なUnlambda-style SKI formula はこの中に含まれる。
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct Sequence(VecDeque<Token>);
 
@@ -27,25 +25,6 @@ impl From<VecDeque<Token>> for Sequence {
 impl From<Vec<Token>> for Sequence {
     fn from(vec: Vec<Token>) -> Self {
         Sequence(VecDeque::from(vec))
-    }
-}
-
-// TODO: TryFromにするべき?
-impl From<RawAst> for Sequence {
-    fn from(ast: RawAst) -> Self {
-        // TODO: 非常に実装が汚い
-        let mut vec = VecDeque::new();
-        vec.push_back(ast.get_data());
-        let mut seq = Sequence::from(vec);
-        match ast.get_function() {
-            Some(f) => seq.join(&Sequence::from(*f)),
-            None => (),
-        };
-        match ast.get_argument() {
-            Some(a) => seq.join(&Sequence::from(*a)),
-            None => (),
-        };
-        seq
     }
 }
 
@@ -78,14 +57,6 @@ impl TryFrom<&str> for Sequence {
             }
         }
         Ok(Sequence::from(v))
-    }
-}
-
-impl FromStr for Sequence {
-    type Err = LexiconError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Sequence::try_from(s)
     }
 }
 
@@ -129,6 +100,10 @@ impl Sequence {
         Sequence(VecDeque::new())
     }
 
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub fn pop(&mut self) -> Option<Token> {
         self.0.pop_back()
     }
@@ -147,8 +122,58 @@ impl Sequence {
             self.0.push_back(*t)
         }
     }
+
+    pub fn is_valid(&self) -> Result<bool, FormulaError> {
+        let mut counter = 1;
+        for t in self {
+            match t {
+                Token::Apply => counter += 1,
+                Token::Atom(_) => counter -= 1,
+            }
+        }
+        if counter == 0 {
+            Ok(true)
+        } else if counter > 0 {
+            Err(FormulaError::NotEnoughAtoms)
+        } else {
+            // counter < 0
+            Err(FormulaError::SurplusTokens)
+        }
+    }
+
+    pub fn valid_point(&self) -> Result<usize, FormulaError> {
+        let mut counter = 1;
+        for (ord, t) in self.into_iter().enumerate() {
+            match t {
+                Token::Apply => counter += 1,
+                Token::Atom(_) => counter -= 1,
+            }
+            if counter == 0 {
+                return Ok(ord);
+            }
+        }
+        if counter > 0 {
+            Err(FormulaError::NotEnoughAtoms)
+        } else {
+            // counter < 0
+            Err(FormulaError::SurplusTokens)
+        }
+    }
+
+    pub fn cut_formula(self) -> Result<Self, FormulaError> {
+        let point = self.valid_point()?;
+        let (ret, _) = self.split(point);
+        Ok(ret)
+    }
+
+    pub fn formula_and_rest(self) -> Result<(Self, Self), FormulaError> {
+        let point = self.valid_point()?;
+        let ret = self.split(point);
+        Ok(ret)
+    }
 }
 
+#[cfg(test)]
 mod tests {
 
     use super::*;
@@ -236,5 +261,51 @@ mod tests {
                 assert_eq!(t, &Token::k());
             }
         }
+    }
+
+    #[test]
+    fn simple_check_valid_token() {
+        let seq = Sequence::try_from("``sii").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Ok(true));
+        let seq = Sequence::try_from("`si").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Ok(true));
+        let seq = Sequence::try_from("`ki").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Ok(true));
+    }
+
+    #[test]
+    fn simple_check_invalid_token() {
+        // too much apply token
+        let seq = Sequence::try_from("```").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Err(FormulaError::NotEnoughAtoms));
+
+        // too much atom token
+        let seq = Sequence::try_from("`sss").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Err(FormulaError::SurplusTokens));
+
+        // empty token (equals to too much apply)
+        let seq = Sequence::try_from("").unwrap();
+        let result = seq.is_valid();
+        assert_eq!(result, Err(FormulaError::NotEnoughAtoms));
+    }
+
+    #[test]
+    fn search_valid_point() {
+        let s = Sequence::try_from("``sii").unwrap();
+        assert_eq!(s.valid_point(), Ok(4));
+        let s = Sequence::try_from("``siii").unwrap();
+        assert_eq!(s.valid_point(), Ok(4));
+        let s = Sequence::try_from("``si").unwrap();
+        assert_eq!(s.valid_point(), Err(FormulaError::NotEnoughAtoms));
+
+        let mut s = Sequence::try_from("`sk").unwrap();
+        assert_eq!(s.valid_point(), Ok(2));
+        s.dequeue(); // will be ["s", "k"]
+        assert_eq!(s.valid_point(), Ok(0));
     }
 }

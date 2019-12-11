@@ -1,13 +1,5 @@
-use std::convert::TryFrom;
-
-use crate::token::{Atom, Token};
-
-pub trait Combinator {
-    type Argument: Combinator;
-    type Target: Combinator;
-
-    fn apply(&self, arg: Self::Argument) -> Self::Target;
-}
+use crate::lambda::{Apply, Eval, Lambda};
+use crate::token::Atom;
 
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct SkiContainer1 {
@@ -73,7 +65,7 @@ impl From<Atom> for Ski {
     }
 }
 
-impl Combinator for Ski {
+impl Apply for Ski {
     type Argument = Self;
     type Target = Self;
 
@@ -96,10 +88,22 @@ impl Combinator for Ski {
     }
 }
 
-mod tests {
+impl Eval for Ski {
+    type Target = Ski;
 
-    use super::*;
-
-    #[test]
-    fn s_apply() {}
+    fn eval(&self) -> Self::Target {
+        match self {
+            Ski::S => Ski::S,
+            Ski::K => Ski::K,
+            Ski::I => Ski::I,
+            Ski::Sp(_sp) => self.clone(),
+            Ski::Kp(_kp) => self.clone(),
+            Ski::Spp(_spp) => self.clone(),
+        }
+    }
 }
+
+impl Lambda for Ski {}
+
+#[cfg(test)]
+mod tests {}

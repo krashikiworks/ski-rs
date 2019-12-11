@@ -1,8 +1,9 @@
 pub mod ast;
-pub mod combinator;
 pub mod error;
+pub mod lambda;
 pub mod sequence;
 pub mod stack;
+pub mod term;
 pub mod token;
 
 /*

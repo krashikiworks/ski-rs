@@ -6,6 +6,16 @@ pub enum Atom {
     I,
 }
 
+impl Into<String> for Atom {
+    fn into(self) -> String {
+        match self {
+            Self::S => String::from("s"),
+            Self::K => String::from("k"),
+            Self::I => String::from("i"),
+        }
+    }
+}
+
 /// Unlambda-style SKI expression の構成子として有効な記号
 #[derive(Debug, Eq, PartialEq, Hash, Clone, Copy)]
 pub enum Token {
@@ -16,6 +26,15 @@ pub enum Token {
 impl From<Atom> for Token {
     fn from(atom: Atom) -> Self {
         Token::Atom(atom)
+    }
+}
+
+impl Into<String> for Token {
+    fn into(self) -> String {
+        match self {
+            Self::Apply => String::from("`"),
+            Self::Atom(atom) => atom.into(),
+        }
     }
 }
 

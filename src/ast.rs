@@ -17,7 +17,7 @@ impl AstInner {
     }
 
     pub fn to_argument(&self) -> Ast {
-        *self.function.clone()
+        *self.argument.clone()
     }
 
     pub fn into_function(self) -> Ast {
@@ -49,7 +49,7 @@ impl From<Ski> for Ast {
             }),
             // Kp(x) = `kx
             Ski::Kp(kp) => Ast::Apply(AstInner {
-                function: Box::new(Ast::Leaf(Atom::S)),
+                function: Box::new(Ast::Leaf(Atom::K)),
                 argument: Box::new(Ast::from(kp.get())),
             }),
             // Spp(x, y) = `sp(x)y = ``sxy = `(`sx)y
@@ -100,7 +100,32 @@ impl TryFrom<&str> for Ast {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lambda::Apply;
     use crate::token::Atom::{K, S};
+
+    #[test]
+    fn from_term() {
+        // ```sski -> ``si`ki
+        let ski = Ski::from(Atom::S)
+            .apply(Ski::from(Atom::S))
+            .apply(Ski::from(Atom::K))
+            .apply(Ski::from(Atom::I));
+
+        let ast = Ast::from(ski);
+
+        let target = Ast::Apply(AstInner {
+            function: Box::new(Ast::Apply(AstInner {
+                function: Box::new(Ast::Leaf(Atom::S)),
+                argument: Box::new(Ast::Leaf(Atom::I)),
+            })),
+            argument: Box::new(Ast::Apply(AstInner {
+                function: Box::new(Ast::Leaf(Atom::K)),
+                argument: Box::new(Ast::Leaf(Atom::I)),
+            })),
+        });
+
+        assert_eq!(ast, target);
+    }
 
     #[test]
     fn try_from_sequence() {

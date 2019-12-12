@@ -40,7 +40,10 @@ impl Stax {
         if self.stack.len() != 1 {
             Err(FormulaError::SurplusTokens)
         } else {
-            Ok(Sequence::from(Ast::from(self.stack.pop().unwrap())))
+            let res = self.stack.pop().unwrap();
+            let ast = Ast::from(res);
+            let seq = Sequence::from(ast);
+            Ok(seq)
         }
     }
 
@@ -67,6 +70,15 @@ mod tests {
 
     #[test]
     fn eval() {
+        let str = "```sski";
+        let seq = Sequence::try_from(str).unwrap();
+        let mut stax = Stax::from(seq);
+        let result = stax.eval();
+
+        let target = Sequence::try_from("``si`ki").unwrap();
+
+        assert_eq!(result, Ok(target));
+
         let str = "```s``kii```skiis";
         let seq = Sequence::try_from(str).unwrap();
         let mut stax = Stax::from(seq);

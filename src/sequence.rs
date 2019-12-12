@@ -60,6 +60,25 @@ impl TryFrom<&str> for Sequence {
     }
 }
 
+impl TryFrom<String> for Sequence {
+    type Error = LexiconError;
+
+    fn try_from(s: String) -> Result<Self, Self::Error> {
+        Ok(Sequence::try_from(s.as_str())?)
+    }
+}
+
+impl Into<String> for Sequence {
+    fn into(self) -> String {
+        let mut string = String::new();
+
+        for t in self {
+            string = format!("{}{}", string, Into::<String>::into(t));
+        }
+        string
+    }
+}
+
 impl Add for Sequence {
     type Output = Self;
 
@@ -205,10 +224,22 @@ mod tests {
     }
 
     #[test]
-    fn from_str_print() {
+    fn from_ast() {
+        let str = "``si`ki";
+        let ast = Ast::try_from(str).unwrap();
+        let seq = Sequence::from(ast);
+
+        let target = Sequence::try_from(str).unwrap();
+
+        assert_eq!(seq, target);
+    }
+
+    #[test]
+    fn into_str() {
         let str = "```s``kii";
-        let tokens = Sequence::try_from(str).unwrap();
-        println!("tokenize_print: '{}' -> {:?}", str, tokens);
+        let seq = Sequence::try_from(str).unwrap();
+        let seq = Into::<String>::into(seq);
+        assert_eq!(seq, str);
     }
 
     #[test]
@@ -264,7 +295,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_check_valid_token() {
+    fn valid_sequence() {
         let seq = Sequence::try_from("``sii").unwrap();
         let result = seq.is_valid();
         assert_eq!(result, Ok(true));
@@ -277,7 +308,7 @@ mod tests {
     }
 
     #[test]
-    fn simple_check_invalid_token() {
+    fn invalid_sequence() {
         // too much apply token
         let seq = Sequence::try_from("```").unwrap();
         let result = seq.is_valid();
@@ -295,7 +326,7 @@ mod tests {
     }
 
     #[test]
-    fn search_valid_point() {
+    fn valid_point() {
         let s = Sequence::try_from("``sii").unwrap();
         assert_eq!(s.valid_point(), Ok(4));
         let s = Sequence::try_from("``siii").unwrap();
